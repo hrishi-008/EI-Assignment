@@ -1,3 +1,0 @@
-Design Pattern
-OOPS
-TypeScript
