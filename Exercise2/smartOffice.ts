@@ -1,4 +1,4 @@
-// smart_office_system.ts
+import * as readline from "readline";
 
 class OfficeFacility {
   private static instance: OfficeFacility;
@@ -165,14 +165,12 @@ interface Observer {
 
 class ACController implements Observer {
   update(room: Room): void {
-    // Simulate AC control
     console.log(`AC in ${room.name} turned ${room.isOccupied ? "on" : "off"}`);
   }
 }
 
 class LightController implements Observer {
   update(room: Room): void {
-    // Simulate light control
     console.log(
       `Lights in ${room.name} turned ${room.isOccupied ? "on" : "off"}`
     );
@@ -234,82 +232,154 @@ class BookingSystem {
   }
 }
 
-// Command Pattern
-interface Command {
-  execute(): string;
-}
+class CLI {
+  private rl: readline.Interface;
+  private office: OfficeFacility;
+  private bookingSystem: BookingSystem;
 
-class BookRoomCommand implements Command {
-  constructor(
-    private bookingSystem: BookingSystem,
-    private roomName: string,
-    private startTime: Date,
-    private duration: number
-  ) {}
+  constructor() {
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    this.office = OfficeFacility.getInstance();
+    this.bookingSystem = new BookingSystem();
+    this.initializeOffice();
+  }
 
-  execute(): string {
-    return this.bookingSystem.bookRoom(
-      this.roomName,
-      this.startTime,
-      this.duration
+  private initializeOffice() {
+    console.log(this.office.configureRooms(3));
+    console.log(this.office.setRoomCapacity("Room 1", 10));
+    console.log(this.office.setRoomCapacity("Room 2", 8));
+    console.log(this.office.setRoomCapacity("Room 3", 6));
+
+    this.office.getAllRooms().forEach((room) => {
+      room.addObserver(new ACController());
+      room.addObserver(new LightController());
+    });
+  }
+
+  public start() {
+    this.showMenu();
+  }
+
+  private showMenu() {
+    console.log("\n--- Smart Office System ---");
+    console.log("1. Show all rooms");
+    console.log("2. Book a room");
+    console.log("3. Cancel a booking");
+    console.log("4. Add occupants to a room");
+    console.log("5. Show room statistics");
+    console.log("6. Exit");
+    this.rl.question("Enter your choice: ", (choice) =>
+      this.handleChoice(choice)
     );
   }
-}
 
-class CancelBookingCommand implements Command {
-  constructor(private bookingSystem: BookingSystem, private roomName: string) {}
-
-  execute(): string {
-    return this.bookingSystem.cancelBooking(this.roomName);
-  }
-}
-
-class AddOccupantCommand implements Command {
-  constructor(
-    private office: OfficeFacility,
-    private roomName: string,
-    private count: number
-  ) {}
-
-  execute(): string {
-    const room = this.office.getRoom(this.roomName);
-    if (room) {
-      return room.addOccupants(this.count);
+  private handleChoice(choice: string) {
+    switch (choice) {
+      case "1":
+        this.showAllRooms();
+        break;
+      case "2":
+        this.bookRoom();
+        break;
+      case "3":
+        this.cancelBooking();
+        break;
+      case "4":
+        this.addOccupants();
+        break;
+      case "5":
+        this.showRoomStatistics();
+        break;
+      case "6":
+        this.exit();
+        return;
+      default:
+        console.log("Invalid choice. Please try again.");
     }
-    return `${this.roomName} does not exist.`;
+    this.showMenu();
+  }
+
+  private showAllRooms() {
+    console.log("\nAll Rooms:");
+    this.office.getAllRooms().forEach((room) => {
+      console.log(
+        `${room.name} - Capacity: ${room.maxCapacity}, Occupied: ${room.isOccupied}`
+      );
+    });
+  }
+
+  private bookRoom() {
+    this.rl.question("Enter room name: ", (roomName) => {
+      this.rl.question("Enter start time (HH:MM): ", (startTimeStr) => {
+        this.rl.question("Enter duration in minutes: ", (durationStr) => {
+          const [hours, minutes] = startTimeStr.split(":").map(Number);
+          const startTime = new Date();
+          startTime.setHours(hours, minutes);
+          const duration = parseInt(durationStr);
+
+          const result = this.bookingSystem.bookRoom(
+            roomName,
+            startTime,
+            duration
+          );
+          console.log(result);
+          this.showMenu();
+        });
+      });
+    });
+  }
+
+  private cancelBooking() {
+    this.rl.question("Enter room name to cancel booking: ", (roomName) => {
+      const result = this.bookingSystem.cancelBooking(roomName);
+      console.log(result);
+      this.showMenu();
+    });
+  }
+
+  private addOccupants() {
+    this.rl.question("Enter room name: ", (roomName) => {
+      this.rl.question(
+        "Enter number of occupants to add (use negative for removing): ",
+        (countStr) => {
+          const count = parseInt(countStr);
+          const room = this.office.getRoom(roomName);
+          if (room) {
+            console.log(room.addOccupants(count));
+          } else {
+            console.log(`${roomName} does not exist.`);
+          }
+          this.showMenu();
+        }
+      );
+    });
+  }
+
+  private showRoomStatistics() {
+    this.rl.question("Enter room name: ", (roomName) => {
+      const room = this.office.getRoom(roomName);
+      if (room) {
+        console.log(room.getStatistics());
+      } else {
+        console.log(`${roomName} does not exist.`);
+      }
+      this.showMenu();
+    });
+  }
+
+  private exit() {
+    console.log("Thank you for using the Smart Office System. Goodbye!");
+    this.rl.close();
+    process.exit(0);
   }
 }
 
-// Main application
 function main() {
-  const office = OfficeFacility.getInstance();
-  const bookingSystem = new BookingSystem();
-
-  // Configure office
-  console.log(office.configureRooms(3));
-  console.log(office.setRoomCapacity("Room 1", 10));
-
-  // Add observers
-  office.getAllRooms().forEach((room) => {
-    room.addObserver(new ACController());
-    room.addObserver(new LightController());
-  });
-
-  // Example usage
-  const commands: Command[] = [
-    new AddOccupantCommand(office, "Room 1", 2),
-    new BookRoomCommand(bookingSystem, "Room 1", new Date(), 60),
-    new CancelBookingCommand(bookingSystem, "Room 1"),
-    new AddOccupantCommand(office, "Room 1", -2),
-  ];
-
-  commands.forEach((command) => console.log(command.execute()));
-
-  // Keep the main thread running to allow the auto-release interval to work
-  setInterval(() => {
-    console.log("System running...");
-    office.getAllRooms().forEach((room) => console.log(room.getStatistics()));
-  }, 10000);
+  const cli = new CLI();
+  cli.start();
 }
 
 main();
